@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Curl命令转换器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+
+<body class="bg-gray-100">
+    <!-- 导航栏 -->
+    <nav class="bg-white shadow-md">
+        <div class="container mx-auto px-4">
+            <div class="flex justify-between items-center py-4">
+                <h1 class="text-xl font-bold text-blue-600">
+                    <i class="fas fa-code mr-2"></i>Curl命令转换器
+                </h1>
+                <div id="userControls" class="flex items-center space-x-4">
+                    <!-- 用户控件将通过 JavaScript 动态加载 -->
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto p-4">
+        <!-- 警告消息 -->
+        <div id="alert" class="hidden mb-4 p-4 rounded-md"></div>
+        
+        <!-- 主内容区 -->
+        <div id="mainContent">
+            <div class="bg-white shadow-md rounded-lg p-6 mb-6">
+                <h2 class="text-2xl font-bold mb-4">输入 curl 命令</h2>
+                
+                <form id="curlForm" class="mb-4">
+                    <div class="flex gap-2">
+                        <input type="text" id="curlCommand" placeholder="输入curl命令，例如: curl https://api.example.com/users" required
+                               class="flex-grow px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <button type="submit" 
+                                class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                            <i class="fas fa-exchange-alt mr-2"></i>转换
+                        </button>
+                    </div>
+                </form>
+                
+                <!-- 示例命令 -->
+                <div class="bg-gray-50 p-4 rounded-md">
+                    <h3 class="font-semibold mb-2">示例命令：</h3>
+                    <div class="space-y-1 text-sm">
+                        <div class="cursor-pointer hover:text-blue-600" onclick="setExample('curl https://api.example.com/users')">
+                            • curl https://api.example.com/users
+                        </div>
+                        <div class="cursor-pointer hover:text-blue-600" onclick="setExample('curl -X POST https://api.example.com/users -H \"Content-Type: application/json\" -d \'{\"name\":\"John\",\"email\":\"john@example.com\"}\'')">
+                            • curl -X POST https://api.example.com/users -H "Content-Type: application/json" -d '{"name":"John","email":"john@example.com"}'
+                        </div>
+                        <div class="cursor-pointer hover:text-blue-600" onclick="setExample('curl -H \"Authorization: Bearer token123\" https://api.example.com/profile')">
+                            • curl -H "Authorization: Bearer token123" https://api.example.com/profile
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 结果表格 -->
+            <div class="bg-white shadow-md rounded-lg overflow-hidden">
+                <div class="bg-gray-200 px-4 py-2">
+                    <h3 class="text-lg font-semibold">转换结果</h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th class="px-4 py-2 text-left">序号</th>
+                                <th class="px-4 py-2 text-left">curl 命令</th>
+                                <th class="px-4 py-2 text-left">Python 代码</th>
+                                <th class="px-4 py-2 text-left">状态</th>
+                                <th class="px-4 py-2 text-left">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultsTable">
+                            <!-- 结果将通过 JavaScript 动态加载 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 登录提示 -->
+        <div id="loginPrompt" class="hidden">
+            <div class="bg-white shadow-md rounded-lg p-8 text-center">
+                <i class="fas fa-lock text-6xl text-gray-400 mb-4"></i>
+                <h2 class="text-2xl font-bold mb-4">请先登录</h2>
+                <p class="text-gray-600 mb-6">登录后可以使用 curl 命令转换功能</p>
+                <div class="space-x-4">
+                    <a href="/login" class="inline-block bg-blue-500 text-white px-6 py-2 rounded-md hover:bg-blue-600">
+                        <i class="fas fa-sign-in-alt mr-2"></i>登录
+                    </a>
+                    <a href="/register" class="inline-block bg-green-500 text-white px-6 py-2 rounded-md hover:bg-green-600">
+                        <i class="fas fa-user-plus mr-2"></i>注册
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 检查用户登录状态
+        function checkAuthStatus() {
+            const token = localStorage.getItem('access_token');
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            const userControls = document.getElementById('userControls');
+            const mainContent = document.getElementById('mainContent');
+            const loginPrompt = document.getElementById('loginPrompt');
+            
+            if (token) {
+                // 用户已登录
+                userControls.innerHTML = `
+                    <a href="/profile" class="text-blue-500 hover:text-blue-700">
+                        <i class="fas fa-user mr-1"></i>个人信息
+                    </a>
+                    <span class="text-gray-700">欢迎, ${user.username}</span>
+                    <button onclick="logout()" class="text-red-500 hover:text-red-700">
+                        <i class="fas fa-sign-out-alt mr-1"></i>退出
+                    </button>
+                `;
+                mainContent.classList.remove('hidden');
+                loginPrompt.classList.add('hidden');
+            } else {
+                // 用户未登录
+                userControls.innerHTML = `
+                    <a href="/login" class="text-blue-500 hover:text-blue-700">
+                        <i class="fas fa-sign-in-alt mr-1"></i>登录
+                    </a>
+                    <a href="/register" class="text-green-500 hover:text-green-700">
+                        <i class="fas fa-user-plus mr-1"></i>注册
+                    </a>
+                `;
+                mainContent.classList.add('hidden');
+                loginPrompt.classList.remove('hidden');
+            }
+        }
+        
+        // 退出登录
+        function logout() {
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('user');
+            showAlert('已成功退出登录', 'success');
+            checkAuthStatus();
+        }
+        
+        // 显示警告消息
+        function showAlert(message, type) {
+            const alertDiv = document.getElementById('alert');
+            alertDiv.className = `mb-4 p-4 rounded-md ${type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`;
+            alertDiv.textContent = message;
+            alertDiv.classList.remove('hidden');
+            
+            setTimeout(() => {
+                alertDiv.classList.add('hidden');
+            }, 3000);
+        }
+        
+        // 设置示例命令
+        function setExample(command) {
+            document.getElementById('curlCommand').value = command;
+        }
+        
+        // 复制到剪贴板
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                showAlert('已复制到剪贴板', 'success');
+            }).catch(() => {
+                showAlert('复制失败', 'error');
+            });
+        }
+        
+        // 表单提交处理
+        document.getElementById('curlForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const curlCommand = document.getElementById('curlCommand').value;
+            const token = localStorage.getItem('access_token');
+            
+            if (!token) {
+                showAlert('请先登录', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `curl_command=${encodeURIComponent(curlCommand)}`
+                });
+                
+                if (response.ok) {
+                    // 刷新页面获取新结果
+                    location.reload();
+                } else {
+                    showAlert('转换失败', 'error');
+                }
+            } catch (error) {
+                showAlert('网络错误', 'error');
+            }
+        });
+        
+        // 页面加载时检查认证状态
+        checkAuthStatus();
+        
+        // 加载结果数据
+        function loadResults() {
+            const results = {{ results|tojson|safe }};
+            const resultsTable = document.getElementById('resultsTable');
+            
+            if (results.length === 0) {
+                resultsTable.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="px-4 py-8 text-center text-gray-500">
+                            <i class="fas fa-inbox text-4xl mb-2"></i>
+                            <div>暂无转换结果</div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            resultsTable.innerHTML = results.map((result, index) => `
+                <tr class="border-t hover:bg-gray-50">
+                    <td class="px-4 py-2">${index + 1}</td>
+                    <td class="px-4 py-2">
+                        <code class="text-sm bg-gray-100 p-1 rounded">${result.curl}</code>
+                    </td>
+                    <td class="px-4 py-2">
+                        <pre class="text-xs bg-gray-100 p-2 rounded overflow-x-auto">${result.python}</pre>
+                    </td>
+                    <td class="px-4 py-2">
+                        <span class="px-2 py-1 text-xs rounded-full ${result.status === '转换成功' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                            ${result.status}
+                        </span>
+                    </td>
+                    <td class="px-4 py-2">
+                        <button onclick="copyToClipboard(\`${result.python.replace(/`/g, '\\`')}\`)" 
+                                class="text-blue-500 hover:text-blue-700 text-sm">
+                            <i class="fas fa-copy mr-1"></i>复制
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+        
+        // 加载结果
+        loadResults();
+    </script>
+</body>
+
+</html>
