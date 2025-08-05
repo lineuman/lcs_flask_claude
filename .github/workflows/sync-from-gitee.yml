@@ -44,6 +44,11 @@ jobs:
           GITHUB_URL="https://$GH_TOKEN@github.com/lineuman/lcs_flask_claude.git"
           echo "🚀 Pushing to GitHub..."
           git init
+          # 如果 origin 已存在，先删除
+          if git remote | grep -q origin; then
+            echo "🗑️ Remote origin already exists, removing..."
+            git remote remove origin
+          fi
           git remote add origin "$GITHUB_URL"
           
           # Try to push to main, if fails, try master
