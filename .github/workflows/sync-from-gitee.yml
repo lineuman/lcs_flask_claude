@@ -24,7 +24,7 @@ jobs:
           git config user.email "actions@github.com"
 
           # 添加 GitHub 远程仓库
-          git remote add github https://$GH_TOKEN@github.com/lineuman/lcs_flask_claude.git
+          git remote add github https://lineuman:${{ secrets.GH_TOKEN }}@github.com/lineuman/lcs_flask_claude.git
 
           # 强制推送到 GitHub 的 master 分支
           git push -f github master
