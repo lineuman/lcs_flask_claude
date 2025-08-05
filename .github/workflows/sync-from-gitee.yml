@@ -20,7 +20,7 @@ jobs:
           cd repo
 
           # 设置用户信息（必须）
-          git config user.name "GitHub Actions"
+          git config user.name "lineuman"
           git config user.email "actions@github.com"
 
           # 添加 GitHub 远程仓库
