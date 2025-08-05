@@ -1,0 +1,19 @@
+name: Sync from Gitee
+
+on:
+  schedule:
+    # 每天凌晨3点同步（UTC时间）
+    - cron: '0 3 * * *'
+  workflow_dispatch: # 允许手动触发
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mirror Gitee to GitHub
+        uses: 
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.GITEE_PRIVATE_KEY }}
+        with:
+          source-repo: git@gitee.com:lineuman/lcs_flask_claude.git
+          destination-repo: https://github.com/lineuman/lcs_flask_claude

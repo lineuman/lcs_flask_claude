@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
-from flask import Blueprint, render_template, request, jsonify, redirect, url_for
+from flask import Blueprint, render_template, request, jsonify, redirect, url_for, send_file
 from flask_jwt_extended import jwt_required, get_jwt
 from app.services.auth_service import AuthService
 from app.services.user_service import UserService
 from app.services.converter_service import ConverterService
+from app.services.storage_service import StorageService
+from app.services.user_variable_service import UserVariableService
 
 main_bp = Blueprint('main', __name__)
 
@@ -37,6 +39,7 @@ def login():
     
     if not username or not password:
         return jsonify({"msg": "缺少用户名或密码"}), 400
+    
     
     auth_result = AuthService.authenticate_user(username, password)
     if auth_result:
@@ -177,3 +180,338 @@ def change_password():
         return jsonify({"message": str(e)}), 400
     except Exception as e:
         return jsonify({"message": f"密码修改失败: {str(e)}"}), 500
+
+# 文件管理页面
+@main_bp.route('/files', methods=['GET'])
+def files_page():
+    return render_template('files.html')
+
+# 文件上传API
+@main_bp.route('/api/files/upload', methods=['POST'])
+@jwt_required()
+def upload_file():
+    current_user = AuthService.get_current_user()
+    
+    if not current_user:
+        return jsonify({"message": "用户不存在"}), 404
+    
+    if 'file' not in request.files:
+        return jsonify({"message": "没有选择文件"}), 400
+    
+    file = request.files['file']
+    description = request.form.get('description', '')
+    
+    try:
+        storage_service = StorageService()
+        result = storage_service.upload_file(file, current_user, description)
+        
+        return jsonify({
+            "message": "文件上传成功",
+            "file": result
+        })
+    except ValueError as e:
+        return jsonify({"message": str(e)}), 400
+    except Exception as e:
+        return jsonify({"message": f"文件上传失败: {str(e)}"}), 500
+
+# 获取用户文件列表API
+@main_bp.route('/api/files', methods=['GET'])
+@jwt_required()
+def get_user_files():
+    current_user = AuthService.get_current_user()
+    
+    if not current_user:
+        return jsonify({"message": "用户不存在"}), 404
+    
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    
+    try:
+        storage_service = StorageService()
+        result = storage_service.get_user_files(current_user, page, per_page)
+        
+        return jsonify({
+            "files": [file.to_dict() for file in result['files']],
+            "pagination": {
+                "total": result['total'],
+                "page": result['page'],
+                "per_page": result['per_page'],
+                "total_pages": result['total_pages']
+            }
+        })
+    except Exception as e:
+        return jsonify({"message": f"获取文件列表失败: {str(e)}"}), 500
+
+# 文件下载API
+@main_bp.route('/api/files/<int:file_id>/download', methods=['GET'])
+@jwt_required()
+def download_file(file_id):
+    current_user = AuthService.get_current_user()
+    
+    if not current_user:
+        return jsonify({"message": "用户不存在"}), 404
+    
+    try:
+        storage_service = StorageService()
+        file_path = storage_service.download_file(file_id, current_user)
+        
+        if not file_path:
+            return jsonify({"message": "文件不存在或无权限"}), 404
+        
+        # 增加下载次数
+        storage_service.increment_download_count(file_id)
+        
+        # 获取文件信息
+        stored_file = storage_service.get_file_by_id(file_id)
+        
+        return send_file(
+            file_path,
+            as_attachment=True,
+            download_name=stored_file.original_filename,
+            mimetype=stored_file.file_type
+        )
+    except Exception as e:
+        return jsonify({"message": f"文件下载失败: {str(e)}"}), 500
+
+# 删除文件API
+@main_bp.route('/api/files/<int:file_id>', methods=['DELETE'])
+@jwt_required()
+def delete_file(file_id):
+    current_user = AuthService.get_current_user()
+    
+    if not current_user:
+        return jsonify({"message": "用户不存在"}), 404
+    
+    try:
+        storage_service = StorageService()
+        storage_service.delete_file(file_id, current_user)
+        
+        return jsonify({"message": "文件删除成功"})
+    except ValueError as e:
+        return jsonify({"message": str(e)}), 400
+    except Exception as e:
+        return jsonify({"message": f"文件删除失败: {str(e)}"}), 500
+
+# 更新文件描述API
+@main_bp.route('/api/files/<int:file_id>/description', methods=['PUT'])
+@jwt_required()
+def update_file_description(file_id):
+    current_user = AuthService.get_current_user()
+    
+    if not current_user:
+        return jsonify({"message": "用户不存在"}), 404
+    
+    data = request.get_json()
+    description = data.get('description', '')
+    
+    try:
+        storage_service = StorageService()
+        storage_service.update_file_description(file_id, current_user, description)
+        
+        return jsonify({"message": "文件描述更新成功"})
+    except ValueError as e:
+        return jsonify({"message": str(e)}), 400
+    except Exception as e:
+        return jsonify({"message": f"文件描述更新失败: {str(e)}"}), 500
+
+# 获取文件信息API
+@main_bp.route('/api/files/<int:file_id>', methods=['GET'])
+@jwt_required()
+def get_file_info(file_id):
+    current_user = AuthService.get_current_user()
+    
+    if not current_user:
+        return jsonify({"message": "用户不存在"}), 404
+    
+    try:
+        storage_service = StorageService()
+        file_info = storage_service.get_file_info(file_id, current_user)
+        
+        if not file_info:
+            return jsonify({"message": "文件不存在或无权限"}), 404
+        
+        return jsonify(file_info)
+    except Exception as e:
+        return jsonify({"message": f"获取文件信息失败: {str(e)}"}), 500
+
+# 获取存储统计信息API
+@main_bp.route('/api/files/stats', methods=['GET'])
+@jwt_required()
+def get_storage_stats():
+    current_user = AuthService.get_current_user()
+    
+    if not current_user:
+        return jsonify({"message": "用户不存在"}), 404
+    
+    try:
+        storage_service = StorageService()
+        stats = storage_service.get_storage_stats(current_user)
+        
+        return jsonify(stats)
+    except Exception as e:
+        return jsonify({"message": f"获取存储统计信息失败: {str(e)}"}), 500
+    
+
+# 变量管理API端点
+@main_bp.route('/variables', methods=['GET'])
+def variables_page():
+    """变量管理页面"""
+    return render_template('variables.html')
+
+@main_bp.route('/api/variables', methods=['GET'])
+@jwt_required()
+def api_get_user_variables():
+    """获取用户所有变量"""
+    current_user = AuthService.get_current_user()
+    
+    if not current_user:
+        return jsonify({"message": "用户不存在"}), 404
+    
+    try:
+        variables = UserVariableService.get_user_variables(current_user.id)
+        # 使用to_dict方法转换为字典列表以便JSON序列化
+        variables_list = [var.to_dict() for var in variables]
+        return jsonify(variables_list)
+    except Exception as e:
+        return jsonify({"message": f"获取用户变量失败: {str(e)}"}), 500
+
+@main_bp.route('/api/variables', methods=['POST'])
+@jwt_required()
+def api_create_user_variable():
+    """创建用户变量"""
+    current_user = AuthService.get_current_user()
+    
+    if not current_user:
+        return jsonify({"message": "用户不存在"}), 404
+    
+    try:
+        data = request.get_json()
+        variable_name = data.get('variable_name')
+        variable_value = data.get('variable_value')
+        
+        if not variable_name or not variable_value:
+            return jsonify({"message": "变量名和变量值不能为空"}), 400
+        
+        # 检查变量名是否已存在
+        existing_variable = UserVariableService.get_variable_by_name(current_user.id, variable_name)
+        if existing_variable:
+            return jsonify({"message": "变量名已存在"}), 400
+        
+        variable = UserVariableService.create_variable(
+            user_id=current_user.id,
+            variable_name=variable_name,
+            variable_value=variable_value
+        )
+        
+        if variable:
+            return jsonify({
+                "message": "变量创建成功",
+                "variable": {
+                    "id": variable.id,
+                    "user_id": variable.user_id,
+                    "variable_name": variable.variable_name,
+                    "variable_value": variable.variable_value,
+                    "created_at": variable.created_at.isoformat() if variable.created_at else None
+                }
+            }), 201
+        else:
+            return jsonify({"message": "变量创建失败"}), 500
+    except Exception as e:
+        return jsonify({"message": f"创建变量失败: {str(e)}"}), 500
+
+@main_bp.route('/api/variables/<int:variable_id>', methods=['PUT'])
+@jwt_required()
+def api_update_user_variable(variable_id):
+    """更新用户变量"""
+    current_user = AuthService.get_current_user()
+    
+    if not current_user:
+        return jsonify({"message": "用户不存在"}), 404
+    
+    try:
+        data = request.get_json()
+        variable_value = data.get('variable_value')
+        variable_name = data.get('variable_name')
+        
+        if not variable_value:
+            return jsonify({"message": "变量值不能为空"}), 400
+        
+        # 检查变量是否存在
+        variable = UserVariableService.get_variable_by_id(variable_id)
+        if not variable:
+            return jsonify({"message": "变量不存在"}), 404
+        
+        # 检查是否是当前用户的变量
+        if variable.user_id != current_user.id:
+            return jsonify({"message": "无权限操作此变量"}), 403
+        
+        # 如果要更新变量名，检查新名称是否已存在
+        if variable_name and variable_name != variable.variable_name:
+            existing_variable = UserVariableService.get_variable_by_name(current_user.id, variable_name)
+            if existing_variable:
+                return jsonify({"message": "变量名已存在"}), 400
+            # 更新变量名
+            variable.variable_name = variable_name
+        
+        # 更新变量值
+        updated_variable = UserVariableService.update_variable(variable_id, variable_value)
+        
+        if updated_variable:
+            return jsonify({
+                "message": "变量更新成功",
+                "variable": {
+                    "id": updated_variable.id,
+                    "user_id": updated_variable.user_id,
+                    "variable_name": updated_variable.variable_name,
+                    "variable_value": updated_variable.variable_value,
+                    "created_at": updated_variable.created_at.isoformat() if updated_variable.created_at else None
+                }
+            })
+        else:
+            return jsonify({"message": "变量更新失败"}), 500
+    except Exception as e:
+        return jsonify({"message": f"更新变量失败: {str(e)}"}), 500
+
+@main_bp.route('/api/variables/<int:variable_id>', methods=['DELETE'])
+@jwt_required()
+def api_delete_user_variable(variable_id):
+    """删除用户变量"""
+    current_user = AuthService.get_current_user()
+    
+    if not current_user:
+        return jsonify({"message": "用户不存在"}), 404
+    
+    try:
+        # 检查变量是否存在
+        variable = UserVariableService.get_variable_by_id(variable_id)
+        if not variable:
+            return jsonify({"message": "变量不存在"}), 404
+        
+        # 检查是否是当前用户的变量
+        if variable.user_id != current_user.id:
+            return jsonify({"message": "无权限操作此变量"}), 403
+        
+        # 删除变量
+        result = UserVariableService.delete_variable(variable_id)
+        
+        if result:
+            return jsonify({"message": "变量删除成功"})
+        else:
+            return jsonify({"message": "变量删除失败"}), 500
+    except Exception as e:
+        return jsonify({"message": f"删除变量失败: {str(e)}"}), 500
+
+# 用户变量管理路由
+@main_bp.route('/variables', methods=['GET'])
+@jwt_required()
+def get_user_variables():
+    current_user = AuthService.get_current_user()
+    
+    if not current_user:
+        return jsonify({"message": "用户不存在"}), 404
+    
+    try:
+        variables = UserVariableService.get_user_variables(current_user.id)
+        return jsonify(variables)
+    except Exception as e:
+        return jsonify({"message": f"获取用户变量失败: {str(e)}"}), 500

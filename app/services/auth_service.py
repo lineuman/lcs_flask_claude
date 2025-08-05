@@ -1,4 +1,3 @@
-import bcrypt
 from flask_jwt_extended import JWTManager, create_access_token, get_jwt_identity, get_jwt, decode_token
 from app.services.user_service import UserService
 from typing import Optional, Dict, Any

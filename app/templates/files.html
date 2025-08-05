@@ -1,0 +1,603 @@
+{% extends "base.html" %}
+
+{% block title %}文件管理 - 管理后台{% endblock %}
+{% block page_title %}文件管理{% endblock %}
+
+{% block extra_head %}
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+{% endblock %}
+
+{% block extra_css %}
+.fade-in {
+    animation: fadeIn 0.3s ease-in;
+}
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.file-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+.file-item {
+    transition: all 0.2s ease;
+}
+{% endblock %}
+
+{% block top_nav_extra %}
+<span id="username" class="text-gray-700 text-sm"></span>
+<button id="logoutBtn" class="text-gray-500 hover:text-gray-700">
+    <i class="fas fa-sign-out-alt w-5 h-5"></i>
+</button>
+{% endblock %}
+
+{% block content %}
+        <!-- 存储统计 -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="p-2 bg-blue-100 rounded-lg">
+                        <i data-lucide="file" class="w-6 h-6 text-blue-600"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">总文件数</p>
+                        <p id="totalFiles" class="text-2xl font-bold text-gray-900">0</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="p-2 bg-green-100 rounded-lg">
+                        <i data-lucide="hard-drive" class="w-6 h-6 text-green-600"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">存储空间</p>
+                        <p id="storageUsed" class="text-2xl font-bold text-gray-900">0 MB</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="p-2 bg-purple-100 rounded-lg">
+                        <i data-lucide="download" class="w-6 h-6 text-purple-600"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">总下载次数</p>
+                        <p id="totalDownloads" class="text-2xl font-bold text-gray-900">0</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="p-2 bg-orange-100 rounded-lg">
+                        <i data-lucide="clock" class="w-6 h-6 text-orange-600"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">今日上传</p>
+                        <p id="todayUploads" class="text-2xl font-bold text-gray-900">0</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 上传区域 -->
+        <div class="bg-white rounded-lg shadow mb-6">
+            <div class="p-6">
+                <h2 class="text-lg font-medium text-gray-900 mb-4">上传文件</h2>
+                <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                    <div id="dropZone" class="space-y-4">
+                        <div class="flex justify-center">
+                            <i data-lucide="upload-cloud" class="w-12 h-12 text-gray-400"></i>
+                        </div>
+                        <div>
+                            <p class="text-gray-600">拖拽文件到此处或</p>
+                            <label for="fileInput" class="cursor-pointer">
+                                <span class="text-blue-600 hover:text-blue-500">点击选择文件</span>
+                                <input id="fileInput" type="file" class="hidden" multiple>
+                            </label>
+                        </div>
+                        <p class="text-sm text-gray-500">支持格式：txt, pdf, png, jpg, jpeg, gif, doc, docx, xls, xlsx, ppt, pptx</p>
+                        <p class="text-sm text-gray-500">最大文件大小：10MB</p>
+                    </div>
+                </div>
+                <div id="uploadProgress" class="hidden mt-4">
+                    <div class="bg-gray-200 rounded-full h-2">
+                        <div id="progressBar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                    <p id="progressText" class="text-sm text-gray-600 mt-2">上传中...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 文件列表 -->
+        <div class="bg-white rounded-lg shadow">
+            <div class="p-6 border-b border-gray-200">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-lg font-medium text-gray-900">我的文件</h2>
+                    <div class="flex items-center space-x-4">
+                        <div class="relative">
+                            <input type="text" id="searchInput" placeholder="搜索文件..." 
+                                   class="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                            <i data-lucide="search" class="absolute left-3 top-2.5 w-4 h-4 text-gray-400"></i>
+                        </div>
+                        <select id="sortSelect" class="border border-gray-300 rounded-md px-3 py-2">
+                            <option value="date">按时间排序</option>
+                            <option value="name">按名称排序</option>
+                            <option value="size">按大小排序</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div id="filesList" class="p-6">
+                <div class="text-center text-gray-500">
+                    <i data-lucide="file-x" class="w-12 h-12 mx-auto mb-4 text-gray-400"></i>
+                    <p>暂无文件</p>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+    <!-- 文件详情模态框 -->
+    <div id="fileModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white rounded-lg shadow-xl max-w-md w-full">
+                <div class="p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-medium text-gray-900">文件详情</h3>
+                        <button id="closeModal" class="text-gray-400 hover:text-gray-600">
+                            <i data-lucide="x" class="w-6 h-6"></i>
+                        </button>
+                    </div>
+                    <div id="fileDetails" class="space-y-3">
+                        <!-- 文件详情内容 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 确认删除模态框 -->
+    <div id="deleteModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white rounded-lg shadow-xl max-w-md w-full">
+                <div class="p-6">
+                    <div class="flex items-center mb-4">
+                        <div class="p-2 bg-red-100 rounded-lg">
+                            <i data-lucide="alert-triangle" class="w-6 h-6 text-red-600"></i>
+                        </div>
+                        <h3 class="ml-3 text-lg font-medium text-gray-900">确认删除</h3>
+                    </div>
+                    <p class="text-gray-600 mb-6">确定要删除这个文件吗？此操作无法撤销。</p>
+                    <div class="flex justify-end space-x-3">
+                        <button id="cancelDelete" class="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">取消</button>
+                        <button id="confirmDelete" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">删除</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 侧边栏切换功能
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        const sidebar = document.getElementById('sidebar');
+        const sidebarOverlay = document.getElementById('sidebarOverlay');
+
+        function toggleSidebar() {
+            sidebar.classList.toggle('-translate-x-full');
+            sidebarOverlay.classList.toggle('opacity-0');
+            sidebarOverlay.classList.toggle('pointer-events-none');
+        }
+
+        function closeSidebar() {
+            sidebar.classList.add('-translate-x-full');
+            sidebarOverlay.classList.add('opacity-0');
+            sidebarOverlay.classList.add('pointer-events-none');
+        }
+
+        sidebarToggle.addEventListener('click', toggleSidebar);
+        sidebarOverlay.addEventListener('click', closeSidebar);
+
+        // 全局变量
+        let currentPage = 1;
+        let currentSort = 'date';
+        let currentSearch = '';
+        let deleteFileId = null;
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            lucide.createIcons();
+            checkAuth();
+            loadStats();
+            loadFiles();
+            setupEventListeners();
+        });
+
+        // 检查认证状态
+        function checkAuth() {
+            const token = localStorage.getItem('access_token');
+            if (!token) {
+                window.location.href = '/login';
+                return;
+            }
+            
+            // 获取用户信息
+            fetch('/api/user/profile', {
+                headers: {
+                    'Authorization': 'Bearer ' + token
+                }
+            })
+            .then(response => {
+                if (response.status === 401) {
+                    window.location.href = '/login';
+                    return;
+                }
+                return response.json();
+            })
+            .then(data => {
+                document.getElementById('username').textContent = data.username;
+            })
+            .catch(error => {
+                console.error('获取用户信息失败:', error);
+                window.location.href = '/login';
+            });
+        }
+
+        // 设置事件监听器
+        function setupEventListeners() {
+            // 文件上传
+            const fileInput = document.getElementById('fileInput');
+            const dropZone = document.getElementById('dropZone');
+            
+            fileInput.addEventListener('change', handleFileSelect);
+            
+            // 拖拽上传
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('border-blue-500', 'bg-blue-50');
+            });
+            
+            dropZone.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('border-blue-500', 'bg-blue-50');
+            });
+            
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('border-blue-500', 'bg-blue-50');
+                const files = e.dataTransfer.files;
+                handleFiles(files);
+            });
+            
+            // 搜索和排序
+            document.getElementById('searchInput').addEventListener('input', (e) => {
+                currentSearch = e.target.value;
+                currentPage = 1;
+                loadFiles();
+            });
+            
+            document.getElementById('sortSelect').addEventListener('change', (e) => {
+                currentSort = e.target.value;
+                currentPage = 1;
+                loadFiles();
+            });
+            
+            // 模态框
+            document.getElementById('closeModal').addEventListener('click', () => {
+                document.getElementById('fileModal').classList.add('hidden');
+            });
+            
+            document.getElementById('cancelDelete').addEventListener('click', () => {
+                document.getElementById('deleteModal').classList.add('hidden');
+            });
+            
+            document.getElementById('confirmDelete').addEventListener('click', () => {
+                if (deleteFileId) {
+                    deleteFile(deleteFileId);
+                }
+            });
+            
+            // 注销
+            document.getElementById('logoutBtn').addEventListener('click', logout);
+        }
+
+        // 处理文件选择
+        function handleFileSelect(e) {
+            const files = e.target.files;
+            handleFiles(files);
+        }
+
+        // 处理文件上传
+        function handleFiles(files) {
+            for (let file of files) {
+                uploadFile(file);
+            }
+        }
+
+        // 上传文件
+        function uploadFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('description', '');
+            
+            const token = localStorage.getItem('access_token');
+            
+            showProgress();
+            
+            fetch('/api/files/upload', {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + token
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideProgress();
+                if (data.message === '文件上传成功') {
+                    showNotification('文件上传成功', 'success');
+                    loadStats();
+                    loadFiles();
+                } else {
+                    showNotification(data.message, 'error');
+                }
+            })
+            .catch(error => {
+                hideProgress();
+                showNotification('文件上传失败', 'error');
+            });
+        }
+
+        // 显示进度条
+        function showProgress() {
+            document.getElementById('uploadProgress').classList.remove('hidden');
+            document.getElementById('progressBar').style.width = '0%';
+        }
+
+        // 隐藏进度条
+        function hideProgress() {
+            document.getElementById('uploadProgress').classList.add('hidden');
+        }
+
+        // 加载统计信息
+        function loadStats() {
+            const token = localStorage.getItem('access_token');
+            
+            fetch('/api/files/stats', {
+                headers: {
+                    'Authorization': 'Bearer ' + token
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('totalFiles').textContent = data.total_files;
+                document.getElementById('storageUsed').textContent = formatBytes(data.total_size);
+                document.getElementById('totalDownloads').textContent = data.total_downloads;
+                document.getElementById('todayUploads').textContent = '0'; // 需要后端支持
+            })
+            .catch(error => {
+                console.error('加载统计信息失败:', error);
+            });
+        }
+
+        // 加载文件列表
+        function loadFiles() {
+            const token = localStorage.getItem('access_token');
+            const params = new URLSearchParams({
+                page: currentPage,
+                per_page: 10
+            });
+            
+            fetch('/api/files?' + params, {
+                headers: {
+                    'Authorization': 'Bearer ' + token
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                renderFiles(data.files);
+            })
+            .catch(error => {
+                console.error('加载文件列表失败:', error);
+            });
+        }
+
+        // 渲染文件列表
+        function renderFiles(files) {
+            const filesList = document.getElementById('filesList');
+            
+            if (files.length === 0) {
+                filesList.innerHTML = `
+                    <div class="text-center text-gray-500">
+                        <i data-lucide="file-x" class="w-12 h-12 mx-auto mb-4 text-gray-400"></i>
+                        <p>暂无文件</p>
+                    </div>
+                `;
+                lucide.createIcons();
+                return;
+            }
+            
+            const filesHtml = files.map(file => `
+                <div class="file-item bg-gray-50 rounded-lg p-4 mb-4 cursor-pointer">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <div class="p-2 bg-blue-100 rounded-lg">
+                                <i data-lucide="file" class="w-6 h-6 text-blue-600"></i>
+                            </div>
+                            <div class="ml-4">
+                                <h3 class="text-sm font-medium text-gray-900">${file.original_filename}</h3>
+                                <p class="text-xs text-gray-500">${formatBytes(file.file_size)} • ${formatDate(file.upload_time)}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <button onclick="showFileDetails(${file.id})" class="text-blue-600 hover:text-blue-800">
+                                <i data-lucide="eye" class="w-4 h-4"></i>
+                            </button>
+                            <button onclick="downloadFile(${file.id})" class="text-green-600 hover:text-green-800">
+                                <i data-lucide="download" class="w-4 h-4"></i>
+                            </button>
+                            <button onclick="confirmDeleteFile(${file.id})" class="text-red-600 hover:text-red-800">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            
+            filesList.innerHTML = filesHtml;
+            lucide.createIcons();
+        }
+
+        // 显示文件详情
+        function showFileDetails(fileId) {
+            const token = localStorage.getItem('access_token');
+            
+            fetch('/api/files/' + fileId, {
+                headers: {
+                    'Authorization': 'Bearer ' + token
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                const detailsHtml = `
+                    <div class="space-y-3">
+                        <div>
+                            <p class="text-sm font-medium text-gray-900">文件名</p>
+                            <p class="text-sm text-gray-600">${data.original_filename}</p>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-gray-900">文件大小</p>
+                            <p class="text-sm text-gray-600">${formatBytes(data.file_size)}</p>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-gray-900">文件类型</p>
+                            <p class="text-sm text-gray-600">${data.file_type}</p>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-gray-900">上传时间</p>
+                            <p class="text-sm text-gray-600">${formatDate(data.upload_time)}</p>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-gray-900">下载次数</p>
+                            <p class="text-sm text-gray-600">${data.download_count}</p>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-gray-900">描述</p>
+                            <p class="text-sm text-gray-600">${data.description || '无描述'}</p>
+                        </div>
+                    </div>
+                `;
+                
+                document.getElementById('fileDetails').innerHTML = detailsHtml;
+                document.getElementById('fileModal').classList.remove('hidden');
+            })
+            .catch(error => {
+                console.error('获取文件详情失败:', error);
+            });
+        }
+
+        // 下载文件
+        function downloadFile(fileId) {
+            const token = localStorage.getItem('access_token');
+            
+            // 创建一个隐藏的iframe来下载文件
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = '/api/files/' + fileId + '/download?token=' + token;
+            document.body.appendChild(iframe);
+            
+            // 5秒后移除iframe
+            setTimeout(() => {
+                document.body.removeChild(iframe);
+            }, 5000);
+        }
+
+        // 确认删除文件
+        function confirmDeleteFile(fileId) {
+            deleteFileId = fileId;
+            document.getElementById('deleteModal').classList.remove('hidden');
+        }
+
+        // 删除文件
+        function deleteFile(fileId) {
+            const token = localStorage.getItem('access_token');
+            
+            fetch('/api/files/' + fileId, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': 'Bearer ' + token
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.message === '文件删除成功') {
+                    showNotification('文件删除成功', 'success');
+                    document.getElementById('deleteModal').classList.add('hidden');
+                    loadStats();
+                    loadFiles();
+                } else {
+                    showNotification(data.message, 'error');
+                }
+            })
+            .catch(error => {
+                showNotification('文件删除失败', 'error');
+            });
+        }
+
+        // 注销
+        function logout() {
+            const token = localStorage.getItem('access_token');
+            
+            fetch('/logout', {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + token
+                }
+            })
+            .then(() => {
+                localStorage.removeItem('access_token');
+                window.location.href = '/login';
+            })
+            .catch(error => {
+                console.error('注销失败:', error);
+                localStorage.removeItem('access_token');
+                window.location.href = '/login';
+            });
+        }
+
+        // 显示通知
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 ${
+                type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+            }`;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+
+        // 格式化字节数
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // 格式化日期
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleString('zh-CN');
+        }
+    </script>
+</body>
+</html>

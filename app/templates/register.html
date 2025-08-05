@@ -1,99 +1,112 @@
-<!DOCTYPE html>
-<html lang="zh">
+{% extends "base.html" %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>用户注册</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
+{% block title %}用户注册 - 管理后台{% endblock %}
 
-<body class="bg-gray-100">
-    <div class="container mx-auto p-4 max-w-md">
-        <div class="bg-white shadow-md rounded-lg p-6">
-            <h1 class="text-2xl font-bold mb-6 text-center">用户注册</h1>
-            
-            <div id="alert" class="hidden mb-4 p-4 rounded-md"></div>
-            
-            <form id="registerForm">
-                <div class="mb-4">
-                    <label for="username" class="block text-sm font-medium text-gray-700 mb-2">用户名</label>
-                    <input type="text" id="username" name="username" required
-                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+{% block top_nav_extra %}
+<a href="/" class="text-gray-600 hover:text-gray-900">
+    <i class="fas fa-arrow-left mr-1"></i>返回首页
+</a>
+{% endblock %}
+
+{% set show_sidebar = False %}
+{% set show_user_controls = False %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-md w-full space-y-8">
+        <div class="bg-white shadow-xl rounded-lg p-8">
+                    <div class="text-center mb-8">
+                        <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100">
+                            <i class="fas fa-user-plus text-green-600"></i>
+                        </div>
+                        <h2 class="mt-6 text-3xl font-extrabold text-gray-900">用户注册</h2>
+                        <p class="mt-2 text-sm text-gray-600">创建账号以使用 Curl 命令转换器</p>
+                    </div>
+                    
+                    <div id="alert" class="hidden mb-4 p-4 rounded-md"></div>
+                    
+                    <form id="registerForm" class="space-y-6">
+                        <div>
+                            <label for="username" class="block text-sm font-medium text-gray-700 mb-2">用户名</label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <i class="fas fa-user text-gray-400"></i>
+                                </div>
+                                <input type="text" id="username" name="username" required
+                                       class="pl-10 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label for="password" class="block text-sm font-medium text-gray-700 mb-2">密码</label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <i class="fas fa-lock text-gray-400"></i>
+                                </div>
+                                <input type="password" id="password" name="password" required
+                                       class="pl-10 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                        </div>
+                        
+                        <button type="submit" 
+                                class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                            <i class="fas fa-user-plus mr-2"></i>注册
+                        </button>
+                    </form>
+                    
+                    <div class="mt-6 text-center">
+                        <p class="text-sm text-gray-600">
+                            已有账号？ 
+                            <a href="/login" class="font-medium text-blue-600 hover:text-blue-500">点击登录</a>
+                        </p>
+                    </div>
+                    
+                    <div class="mt-4 text-center">
+                        <a href="/" class="text-sm text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-arrow-left mr-1"></i>返回首页
+                        </a>
+                    </div>
                 </div>
-                
-                <div class="mb-6">
-                    <label for="password" class="block text-sm font-medium text-gray-700 mb-2">密码</label>
-                    <input type="password" id="password" name="password" required
-                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                </div>
-                
-                <button type="submit" 
-                        class="w-full bg-green-500 text-white py-2 px-4 rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2">
-                    注册
-                </button>
-            </form>
-            
-            <div class="mt-4 text-center">
-                <a href="/login" class="text-blue-500 hover:text-blue-700">已有账号？点击登录</a>
-            </div>
-            
-            <div class="mt-4 text-center">
-                <a href="/" class="text-gray-500 hover:text-gray-700">返回首页</a>
             </div>
         </div>
     </div>
+</div>
+{% endblock %}
 
-    <script>
-        document.getElementById('registerForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            const alertDiv = document.getElementById('alert');
-            
-            try {
-                const response = await fetch('/register', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ username, password })
-                });
-                
-                const data = await response.json();
-                
-                if (response.ok) {
-                    // 注册成功
-                    showAlert('注册成功！请登录', 'success');
-                    
-                    // 清空表单
-                    document.getElementById('registerForm').reset();
-                    
-                    // 2秒后跳转到登录页面
-                    setTimeout(() => {
-                        window.location.href = '/login';
-                    }, 2000);
-                } else {
-                    showAlert(data.msg || '注册失败', 'error');
-                }
-            } catch (error) {
-                showAlert('网络错误，请稍后重试', 'error');
-            }
+{% block extra_js %}
+document.getElementById('registerForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    
+    try {
+        const response = await fetch('/register', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ username, password })
         });
         
-        function showAlert(message, type) {
-            const alertDiv = document.getElementById('alert');
-            alertDiv.className = `mb-4 p-4 rounded-md ${type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`;
-            alertDiv.textContent = message;
-            alertDiv.classList.remove('hidden');
+        const data = await response.json();
+        
+        if (response.ok) {
+            // 注册成功
+            showAlert('注册成功！请登录', 'success');
             
-            // 3秒后自动隐藏
+            // 清空表单
+            document.getElementById('registerForm').reset();
+            
+            // 2秒后跳转到登录页面
             setTimeout(() => {
-                alertDiv.classList.add('hidden');
-            }, 3000);
+                window.location.href = '/login';
+            }, 2000);
+        } else {
+            showAlert(data.msg || '注册失败', 'error');
         }
-    </script>
-</body>
-
-</html>
+    } catch (error) {
+        showAlert('网络错误，请稍后重试', 'error');
+    }
+});
+{% endblock %}

@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用户变量管理</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    {% extends "base.html" %}
+
+    {% block content %}
+    <div class="container mt-4">
+        <h2>用户变量管理</h2>
+        
+        <!-- 添加/编辑变量表单 -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <span id="form-title">添加新变量</span>
+            </div>
+            <div class="card-body">
+                <form id="variable-form">
+                    <input type="hidden" id="variable-id">
+                    <div class="mb-3">
+                        <label for="variable-name" class="form-label">变量名</label>
+                        <input type="text" class="form-control" id="variable-name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="variable-value" class="form-label">变量值</label>
+                        <textarea class="form-control" id="variable-value" rows="3" required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">保存变量</button>
+                    <button type="button" class="btn btn-secondary" id="cancel-edit">取消</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- 变量列表 -->
+        <div class="card">
+            <div class="card-header">
+                变量列表
+            </div>
+            <div class="card-body">
+                <div id="variables-list">
+                    <!-- 变量列表将通过JavaScript动态加载 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let editingVariableId = null;
+
+        // 页面加载完成后获取变量列表
+        document.addEventListener('DOMContentLoaded', function() {
+            fetchVariables();
+            
+            // 绑定表单提交事件
+            document.getElementById('variable-form').addEventListener('submit', saveVariable);
+            document.getElementById('cancel-edit').addEventListener('click', cancelEdit);
+        });
+
+        // 获取用户变量列表
+        function fetchVariables() {
+            fetch('/api/variables')
+                .then(response => response.json())
+                .then(data => {
+                    displayVariables(data);
+                })
+                .catch(error => {
+                    console.error('获取变量列表失败:', error);
+                    alert('获取变量列表失败');
+                });
+        }
+
+        // 显示变量列表
+        function displayVariables(variables) {
+            const listContainer = document.getElementById('variables-list');
+            
+            if (variables.length === 0) {
+                listContainer.innerHTML = '<p>暂无变量</p>';
+                return;
+            }
+
+            let tableHTML = `
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>变量名</th>
+                            <th>变量值</th>
+                            <th>创建时间</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            variables.forEach(variable => {
+                tableHTML += `
+                    <tr>
+                        <td>${variable.variable_name}</td>
+                        <td>${variable.variable_value}</td>
+                        <td>${variable.created_at || 'N/A'}</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" onclick="editVariable(${variable.id}, '${variable.variable_name}', '${variable.variable_value}')">编辑</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteVariable(${variable.id})">删除</button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tableHTML += `
+                    </tbody>
+                </table>
+            `;
+
+            listContainer.innerHTML = tableHTML;
+        }
+
+        // 保存变量（创建或更新）
+        function saveVariable(event) {
+            event.preventDefault();
+            
+            const variableName = document.getElementById('variable-name').value.trim();
+            const variableValue = document.getElementById('variable-value').value.trim();
+            
+            if (!variableName || !variableValue) {
+                alert('请填写完整的变量信息');
+                return;
+            }
+            
+            const data = {
+                variable_name: variableName,
+                variable_value: variableValue
+            };
+            
+            let url = '/api/variables';
+            let method = 'POST';
+            
+            if (editingVariableId) {
+                url = `/api/variables/${editingVariableId}`;
+                method = 'PUT';
+            }
+            
+            fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                } else {
+                    throw new Error('保存失败');
+                }
+            })
+            .then(data => {
+                alert(editingVariableId ? '变量更新成功' : '变量创建成功');
+                cancelEdit();
+                fetchVariables();
+            })
+            .catch(error => {
+                console.error('保存变量失败:', error);
+                alert('保存变量失败: ' + error.message);
+            });
+        }
+
+        // 编辑变量
+        function editVariable(id, name, value) {
+            editingVariableId = id;
+            document.getElementById('variable-id').value = id;
+            document.getElementById('variable-name').value = name;
+            document.getElementById('variable-value').value = value;
+            document.getElementById('form-title').textContent = '编辑变量';
+        }
+
+        // 删除变量
+        function deleteVariable(id) {
+            if (!confirm('确定要删除这个变量吗？')) {
+                return;
+            }
+            
+            fetch(`/api/variables/${id}`, {
+                method: 'DELETE'
+            })
+            .then(response => {
+                if (response.ok) {
+                    alert('变量删除成功');
+                    fetchVariables();
+                } else {
+                    throw new Error('删除失败');
+                }
+            })
+            .catch(error => {
+                console.error('删除变量失败:', error);
+                alert('删除变量失败');
+            });
+        }
+
+        // 取消编辑
+        function cancelEdit() {
+            editingVariableId = null;
+            document.getElementById('variable-form').reset();
+            document.getElementById('form-title').textContent = '添加新变量';
+        }
+    </script>
+    {% endblock %}
+</body>
+</html>
