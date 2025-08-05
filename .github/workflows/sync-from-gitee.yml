@@ -22,16 +22,13 @@ jobs:
       - name: Clone, Sync, and Push
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          GITEE_USERNAME: ${{ secrets.GITEE_USERNAME }}
-          GITEE_PASSWORD: ${{ secrets.GITEE_PASSWORD }}
         run: |
           set -ex
 
           # Step 1: Clone from Gitee
           GITEE_URL="https://gitee.com/lineuman/lcs_flask_claude.git"
-          AUTH_GITEE_URL="https://$GITEE_USERNAME:$GITEE_PASSWORD@gitee.com/lineuman/lcs_flask_claude.git"
           echo "📥 Cloning from Gitee..."
-          git clone -b main --depth=1 "$AUTH_GITEE_URL" workdir || git clone -b master --depth=1 "$AUTH_GITEE_URL" workdir
+          git clone -b master --depth=1 "$GITEE_URL" workdir
           cd workdir
 
           # Step 2: Get latest commit info
