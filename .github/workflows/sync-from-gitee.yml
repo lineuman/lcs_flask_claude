@@ -42,6 +42,7 @@ jobs:
 
           # Step 4: Push to GitHub
           GITHUB_URL="https://$GH_TOKEN@github.com/lineuman/lcs_flask_claude.git"
+          
           echo "🚀 Pushing to GitHub..."
           git init
           # 如果 origin 已存在，先删除
@@ -51,18 +52,9 @@ jobs:
           fi
           git remote add origin "$GITHUB_URL"
           
-          # Try to push to main, if fails, try master
-          if git checkout -b main 2>/dev/null; then
-            git add .
-            git commit -m "Sync from Gitee Commit: $COMMIT_HASH"
-            git push -f origin main
-          elif git checkout -b master 2>/dev/null; then
-            git add .
-            git commit -m "Sync from Gitee Commit: $COMMIT_HASH"
-            git push -f origin master
-          else
-            echo "❌ Failed to create main or master branch."
-            exit 1
-          fi
+          git add .
+          git commit -m "Sync from Gitee Commit: $COMMIT_HASH"
+          git push -f origin master
+
 
           echo "🎉 Sync completed successfully!"
