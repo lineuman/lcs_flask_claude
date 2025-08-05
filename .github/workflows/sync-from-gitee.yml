@@ -1,112 +1,66 @@
-name: Sync from Gitee to GitHub
+name: Sync Gitee to GitHub
 
 on:
   workflow_dispatch:  # 手动触发
   schedule:
-    # 每天 UTC 06,14,15,16（东八区 14,22,23,24）
+    # 每天在 UTC 时间 06:00, 14:00, 15:00, 16:00 运行 (东八区 14:00, 22:00, 23:00, 00:00)
     - cron: '0 6,14,15,16 * * *'
 
 jobs:
   sync:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        # 👇 在此处直接定义你要同步的仓库
-        repos:
-          - name: "Project A"
-            gitee_url: "https://gitee.com/yourname/repo-a.git"
-            gitee_branch: "main"
-            github_repo: "repo-a"
-            github_branch: "main"
-            private: false
-
-          - name: "Project B"
-            gitee_url: "https://gitee.com/yourname/repo-b.git"
-            gitee_branch: "dev"
-            github_repo: "repo-b"
-            github_branch: "main"
-            private: true
-
-          # 可继续添加更多
-      fail-fast: false
-
     steps:
-      - name: Set Config from Matrix
-        id: config
-        run: |
-          echo "name=${{ matrix.repos.name }}" >> $GITHUB_OUTPUT
-          echo "gitee_url=${{ matrix.repos.gitee_url }}" >> $GITHUB_OUTPUT
-          echo "gitee_branch=${{ matrix.repos.gitee_branch }}" >> $GITHUB_OUTPUT
-          echo "github_repo=${{ matrix.repos.github_repo }}" >> $GITHUB_OUTPUT
-          echo "github_branch=${{ matrix.repos.github_branch }}" >> $GITHUB_OUTPUT
-          echo "private=${{ matrix.repos.private }}" >> $GITHUB_OUTPUT
+      - name: Checkout (This Repo)
+        uses: actions/checkout@v4
 
-      - name: Ensure GitHub Repository Exists
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          OWNER: ${{ github.repository_owner }}
-          REPO: ${{ steps.config.outputs.github_repo }}
-          PRIVATE: ${{ steps.config.outputs.private }}
+      - name: Set Git Config
         run: |
-          url="https://api.github.com/repos/$OWNER/$REPO"
-          if curl -s -H "Authorization: Bearer $GH_TOKEN" "$url" | jq -e '.id' > /dev/null; then
-            echo "✅ 仓库已存在，更新私有性"
-            curl -X PATCH -H "Authorization: Bearer $GH_TOKEN" \
-                 -H "Accept: application/vnd.github.v3+json" \
-                 "$url" -d "{\"private\":$PRIVATE}"
-          else
-            echo "📦 仓库不存在，正在创建"
-            curl -X POST -H "Authorization: Bearer $GH_TOKEN" \
-                 -H "Accept: application/vnd.github.v3+json" \
-                 https://api.github.com/user/repos \
-                 -d "{\"name\":\"$REPO\", \"private\":$PRIVATE}"
-          fi
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
 
-      - name: Clone from Gitee and Push to GitHub
+
+      - name: Clone, Sync, and Push
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           GITEE_USERNAME: ${{ secrets.GITEE_USERNAME }}
           GITEE_PASSWORD: ${{ secrets.GITEE_PASSWORD }}
-          GITEE_URL: ${{ steps.config.outputs.gitee_url }}
-          GITEE_BRANCH: ${{ steps.config.outputs.gitee_branch }}
-          GITHUB_REPO: ${{ steps.config.outputs.github_repo }}
-          GITHUB_BRANCH: ${{ steps.config.outputs.github_branch }}
-          OWNER: ${{ github.repository_owner }}
-          NAME: ${{ steps.config.outputs.name }}
         run: |
-          set -eux
+          set -ex
 
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
+          # Step 1: Clone from Gitee
+          GITEE_URL="https://gitee.com/lineuman/lcs_flask_claude.git"
+          AUTH_GITEE_URL="https://$GITEE_USERNAME:$GITEE_PASSWORD@gitee.com/lineuman/lcs_flask_claude.git"
+          echo "📥 Cloning from Gitee..."
+          git clone -b main --depth=1 "$AUTH_GITEE_URL" workdir || git clone -b master --depth=1 "$AUTH_GITEE_URL" workdir
+          cd workdir
 
-          # 构造带认证的 Gitee URL
-          AUTH_URL=$(echo "$GITEE_URL" | sed "s|https://|https://$GITEE_USERNAME:$GITEE_PASSWORD@|")
+          # Step 2: Get latest commit info
+          COMMIT_HASH=$(git rev-parse HEAD)
+          echo "📄 Latest commit: $COMMIT_HASH"
 
-          # 克隆 Gitee 仓库
-          git clone -b "$GITEE_BRANCH" --depth=1 "$AUTH_URL" cloned_repo
-          cd cloned_repo
+          # Step 3: Prepare for GitHub
+          cd ..
+          mv workdir github_repo
+          cd github_repo
 
-          # 检查是否为空
-          if [ -z "$(ls -A .)" ]; then
-            echo "⚠️ 仓库为空，跳过"
-            exit 0
+          # Step 4: Push to GitHub
+          GITHUB_URL="https://$GH_TOKEN@github.com/lineuman/lcs_flask_claude.git"
+          echo "🚀 Pushing to GitHub..."
+          git init
+          git remote add origin "$GITHUB_URL"
+          
+          # Try to push to main, if fails, try master
+          if git checkout -b main 2>/dev/null; then
+            git add .
+            git commit -m "Sync from Gitee Commit: $COMMIT_HASH"
+            git push -f origin main
+          elif git checkout -b master 2>/dev/null; then
+            git add .
+            git commit -m "Sync from Gitee Commit: $COMMIT_HASH"
+            git push -f origin master
+          else
+            echo "❌ Failed to create main or master branch."
+            exit 1
           fi
 
-          COMMIT=$(git rev-parse HEAD)
-
-          # 复制内容到新目录（排除 .git 和 .github）
-          cd ..
-          mkdir -p workspace
-          rsync -av --exclude='.git' --exclude='.github' cloned_repo/ workspace/
-          cd workspace
-
-          # 初始化并推送到 GitHub
-          git init
-          git checkout -b "$GITHUB_BRANCH"
-          git add .
-          git commit -m "Sync from Gitee: $NAME\n\nGitee Commit: $COMMIT"
-
-          git remote add origin "https://$GH_TOKEN@github.com/$OWNER/$GITHUB_REPO.git"
-          git push -f origin "$GITHUB_BRANCH"
-
-          echo "🎉 同步完成: $NAME"
+          echo "🎉 Sync completed successfully!"
